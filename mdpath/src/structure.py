@@ -214,7 +214,10 @@ class DihedralAngles:
             tuple[int, np.ndarray] | None: Tuple of (residue_id, dihedral_angles) if successful, None if failed.
         """
         try:
-            res = self.traj.residues[res_id]
+            ### Edited: res indexing issue
+            res = self.traj.residues[res_id - self.first_res_num]
+            # res = self.traj.residues[res_id]
+            ###
             ags = [res.phi_selection()]
             if not all(ags):
                 return None

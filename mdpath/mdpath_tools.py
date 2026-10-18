@@ -319,6 +319,14 @@ def multitraj_analysis():
                 cluster_pathways_list.append(pathway)
             cluster_pathways_dict[cluster_num] = cluster_pathways_list
 
+        ### Added saving of cluster_pathways_dict and clusters to pickle files for later use
+        with open("multitraj_cluster_pathways_dict.pkl", "wb") as f:
+            pickle.dump(cluster_pathways_dict, f)
+
+        with open("multitraj_cluster_indices.pkl", "wb") as f:
+            pickle.dump(clusters, f)
+        ###
+
         residue_coordinates_dict = MDPathVisualize.residue_CA_coordinates(
             topology, structure_calc.last_res_num
         )

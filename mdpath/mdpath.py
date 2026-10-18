@@ -222,6 +222,12 @@ def main():
     )
     print("\033[1mTrajectory is processed and ready for analysis.\033[0m")
 
+    ### Save per-frame dihedral movements for downstream resampling analyses.
+
+    df_all_residues.to_csv("dihedral_movements.csv", index=False)
+
+    ###
+
     # Calculate the mutual information and build the graph
     nmi_calc = NMICalculator(df_all_residues, invert=invert)
     nmi_calc.entropy_df.to_csv("entropy_df.csv", index=False)

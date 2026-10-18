@@ -19,6 +19,8 @@ from scipy.cluster import hierarchy
 from sklearn.metrics import silhouette_score
 import matplotlib.pyplot as plt
 import seaborn as sns
+# 2026.09.29 
+from scipy.spatial.distance import squareform
 
 
 class PatwayClustering:
@@ -64,11 +66,14 @@ class PatwayClustering:
             overlap_counter = sum(
                 len(self.neighbors[res1] & path2_set) for res1 in path1
             )
+            # 2026.09.26: Added similarity calculation, by normalising the overlap by the total number of possible cross-path residue pairs.
+            similarity = overlap_counter / (len(path1) * len(path2))
+            # changed overlap from overlap_counter to similarity to reflect the new calculation
             result.append(
-                {"Pathway1": i, "Pathway2": j, "Overlap": overlap_counter}
+                {"Pathway1": i, "Pathway2": j, "Overlap": similarity}
             )
             result.append(
-                {"Pathway1": j, "Pathway2": i, "Overlap": overlap_counter}
+                {"Pathway1": j, "Pathway2": i, "Overlap": similarity}
             )
         return result
 
@@ -111,15 +116,26 @@ class PatwayClustering:
         overlap_matrix = self.overlapp_df.pivot(
             index="Pathway1", columns="Pathway2", values="Overlap"
         ).fillna(0)
-        distance_matrix = 1 - overlap_matrix
-        linkage_matrix = hierarchy.linkage(distance_matrix.values, method="complete")
+        # 2026.09.26: Added np.fill diagonal
+        overlap_values = overlap_matrix.to_numpy(copy=True)
+        np.fill_diagonal(overlap_values, 1.0)
+
+        # changed from 1 to 1.0, matrix to values
+        distance_values = 1.0 - overlap_values
+
+        # Changed to squareform to convert the distance matrix to a condensed form for hierarchical clustering
+        linkage_matrix = hierarchy.linkage(
+            squareform(distance_values),
+            method="complete",
+        )
 
         silhouette_scores = []
         for n_clusters in range(2, len(overlap_matrix)):
             cluster_labels = hierarchy.fcluster(
                 linkage_matrix, n_clusters, criterion="maxclust"
             )
-            silhouette_scores.append(silhouette_score(distance_matrix, cluster_labels))
+            # 2026.09.26: Changed to precomputed metric for silhouette score calculation
+            silhouette_scores.append(silhouette_score(distance_values, cluster_labels, metric='precomputed'))
 
         optimal_num_clusters = silhouette_scores.index(max(silhouette_scores)) + 2
         print("Optimal number of clusters:", optimal_num_clusters)
@@ -133,12 +149,25 @@ class PatwayClustering:
         for i, label in enumerate(cluster_labels):
             cluster_pathways[label].append(overlap_matrix.index[i])
 
-        silhouette_avg = silhouette_score(distance_matrix, cluster_labels)
+        silhouette_avg = silhouette_score(distance_values, cluster_labels, metric='precomputed')
         print("Silhouette Score:", silhouette_avg)
         plt.figure(figsize=(10, 7))
+        # Original dendrogram plotting retained for reproducibility:
+        # hierarchy.dendrogram(
+        #     linkage_matrix, labels=overlap_matrix.index, leaf_rotation=90
+        # )
+
+        # 2026.09.30 - Color dendrogram using the silhouette-selected cluster cut and display that cut.
+        lower_height = linkage_matrix[-optimal_num_clusters, 2]
+        upper_height = linkage_matrix[-optimal_num_clusters + 1, 2]
+        cut_height = (lower_height + upper_height) / 2
         hierarchy.dendrogram(
-            linkage_matrix, labels=overlap_matrix.index, leaf_rotation=90
+            linkage_matrix,
+            labels=overlap_matrix.index,
+            leaf_rotation=90,
+            color_threshold=cut_height,
         )
+        plt.axhline(cut_height, color="red", linestyle="--")
         plt.title("Hierarchical Clustering Dendrogram")
         plt.xlabel("Pathways")
         plt.ylabel("Distance")
